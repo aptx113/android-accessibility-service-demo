@@ -32,29 +32,26 @@ class MyAccessibilityService : AccessibilityService() {
                 rootInActiveWindow.findAccessibilityNodeInfosByViewId("com.google.android.googlequicksearchbox:id/googleapp_search_box")
             if (searchBars.size > 0) {
                 val searchBar = searchBars[0]
-                if (searchBar.text == null || !searchBar.text.toString()
-                        .equals("Messages", ignoreCase = true)
-                ) {
-                    val args = Bundle()
-                    args.putString(
-                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                        "messages"
-                    )
-                    searchBar.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-                } else {
-                    val searchSuggestions =
-                        rootInActiveWindow.findAccessibilityNodeInfosByViewId("com.google.android.googlequicksearchbox:id/googleapp_app_name")
-                    searchSuggestions.forEach {
-                        if (it.text.toString() == "Messages") {
-                            val clickableParent = it.parent
-                            clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        }
+                val args = Bundle()
+                args.putString(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    "messages"
+                )
+                searchBar.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+
+                val searchSuggestions =
+                    rootInActiveWindow.findAccessibilityNodeInfosByViewId("com.google.android.googlequicksearchbox:id/googleapp_app_name")
+                searchSuggestions.forEach {
+                    if (it.text.toString() == "Messages") {
+                        val clickableParent = it.parent
+                        clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                     }
                 }
                 searchBar.recycle()
             }
         }
     }
+
     override fun onInterrupt() {
     }
 }
