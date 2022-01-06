@@ -68,8 +68,18 @@ object AutoUtil {
                 it,
                 tag,
                 msg, scope
-            );it.recycle()
+            )
         }
+    }
+
+    fun performScroll(nodeInfo: AccessibilityNodeInfo?, tag: String, msg: String) {
+        if (nodeInfo == null) return
+        if (nodeInfo.isScrollable) nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) else performScroll(
+            nodeInfo.parent,
+            tag,
+            msg
+        )
+        logDebugMsg(tag, msg)
     }
 
     private fun createBundledText(text: String) = Bundle().let {
