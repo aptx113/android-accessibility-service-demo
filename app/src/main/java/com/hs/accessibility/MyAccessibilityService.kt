@@ -1,57 +1,62 @@
 package com.hs.accessibility
 
 import android.accessibilityservice.AccessibilityService
-import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER
+import com.hs.accessibility.utils.AutoUtil.findNodeInfoById
+import com.hs.accessibility.utils.AutoUtil.performScroll
+import com.hs.accessibility.utils.AutoUtil.performSetText
+import kotlinx.coroutines.*
+
+private const val keyword = "Messages"
 
 class MyAccessibilityService : AccessibilityService() {
 
-    override fun onCreate() {
-        super.onCreate()
-        Log.d("ORZ", "create")
-    }
-
-    override fun onServiceConnected() {
-        super.onServiceConnected()
-        Log.d("GG service on", "service on")
-    }
+    private val job = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.Main + job)
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        val rootInActiveWindow = rootInActiveWindow
+        val rootInActiveWindow = rootInActiveWindow ?: return
 
-        if (rootInActiveWindow != null) {
-            val searchBarIdle =
-                rootInActiveWindow.findAccessibilityNodeInfosByViewId("com.google.android.apps.nexuslauncher:id/g_icon")
-            if (searchBarIdle.size > 0) {
-                val searchBar = searchBarIdle[0]
-                searchBar.parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            }
-            val searchBars =
-                rootInActiveWindow.findAccessibilityNodeInfosByViewId("com.google.android.googlequicksearchbox:id/googleapp_search_box")
-            if (searchBars.size > 0) {
-                val searchBar = searchBars[0]
-                val args = Bundle()
-                args.putString(
-                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                    "messages"
+        scope.launch {
+            findNodeInfoById(
+                rootInActiveWindow,
+                "com.google.android.googlequicksearchbox:id/googleapp_search_box"
+            )?.let { nodeInfo ->
+                if (nodeInfo.text == null || !nodeInfo.text.toString()
+                        .equals(keyword, ignoreCase = true)
+                ) performSetText(
+                    nodeInfo,
+                    keyword, "set keyword in search box", SET_TEXT_ACTION
                 )
-                searchBar.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-
-                val searchSuggestions =
-                    rootInActiveWindow.findAccessibilityNodeInfosByViewId("com.google.android.googlequicksearchbox:id/googleapp_app_name")
-                searchSuggestions.forEach {
-                    if (it.text.toString() == "Messages") {
-                        val clickableParent = it.parent
-                        clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    }
+                else {
+                    Log.d("ORZ", "IME")
+                    // require API 30 up
+                    nodeInfo.performAction(ACTION_IME_ENTER.id)
                 }
-                searchBar.recycle()
             }
+            delay(5000)
+            findNodeInfoById(
+                rootInActiveWindow,
+                "com.google.android.googlequicksearchbox:id/webx_web_container"
+            )?.let {
+                val webViewNodeInfo = it.getChild(0)
+                performScroll(
+                    webViewNodeInfo.getChild(0),
+                    "Scroll to Bottom",
+                    SCROLL_ACTION
+                )
+            }
+
         }
     }
 
     override fun onInterrupt() {
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
     }
 }
