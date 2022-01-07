@@ -7,6 +7,12 @@ import android.view.accessibility.AccessibilityNodeInfo
 object AutoUtil {
 
 
+    fun findNodeInfoByText(nodeInfo: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        val list = nodeInfo.findAccessibilityNodeInfosByText(text)
+        return if (list.size > 0) list[0] else null
+    }
+
+
     fun findNodeInfoById(nodeInfo: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? {
         val list = nodeInfo.findAccessibilityNodeInfosByViewId(id)
         return if (list.size > 0) list[0] else null
