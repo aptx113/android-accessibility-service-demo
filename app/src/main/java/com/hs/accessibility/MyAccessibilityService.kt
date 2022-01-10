@@ -8,7 +8,6 @@ import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTI
 import com.hs.accessibility.utils.AutoUtil.findNodeInfoById
 import com.hs.accessibility.utils.AutoUtil.findNodeInfoByText
 import com.hs.accessibility.utils.AutoUtil.logDebugMsg
-import com.hs.accessibility.utils.AutoUtil.performScroll
 import com.hs.accessibility.utils.AutoUtil.performSetText
 import kotlinx.coroutines.*
 
@@ -19,6 +18,8 @@ class MyAccessibilityService : AccessibilityService() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private var accessibilityNodeInfoWebView: AccessibilityNodeInfo? = null
+    private var idCnt: AccessibilityNodeInfo? = null
+    private var idRso: AccessibilityNodeInfo? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val rootInActiveWindow = rootInActiveWindow ?: return
@@ -50,40 +51,11 @@ class MyAccessibilityService : AccessibilityService() {
                 rootInActiveWindow,
                 "com.google.android.googlequicksearchbox:id/webx_web_container"
             )?.let {
-                val searchResult = it.getChild(0).getChild(0)
-                if (searchResult != null)
-                    if (searchResult.childCount > 0) findNodeInfoByText(
-                        rootInActiveWindow,
-                        "All"
-                    )?.let {
-                        logDebugMsg("OOOOOO", "${it.text}")
-                    }
+                findWebViewNode(it.getChild(0))
             }
 
-
-//            findNodeInfoById(
-//                rootInActiveWindow,
-//                "com.google.android.googlequicksearchbox:id/webx_web_container"
-//            )?.let {
-//                val googleSearchKeyword = it.getChild(0).getChild(0)
-//                val gsr = googleSearchKeyword.getChild(2)
-//                val main = gsr.getChild(0)
-//                val cnt = main.getChild(0)
-//                val centerCol = cnt.getChild(3)
-////                val temp = centerCol.getChild(2)
-//                if (centerCol != null) {
-//                    val rso = centerCol.getChild(2).getChild(1)
-//                    var i = 0
-//                    while (i < rso.childCount) {
-//                        val result = rso.getChild(i).getChild(1).getChild(0).getChild(0)
-//                        if (result.isFocusable && !result.contentDescription.isNullOrEmpty()) {
-//                            println(result.getChild(1).text)
-//                        }
-//                        ++i + 1
-//                    }
-//                }
-//            }
-
+            findNodeCnt(accessibilityNodeInfoWebView)
+            getRecordNodes(idCnt)
         }
     }
 
@@ -101,16 +73,48 @@ class MyAccessibilityService : AccessibilityService() {
             val child = rootNode.getChild(i)
             if ("android.webkit.WebView" == child.className) {
                 accessibilityNodeInfoWebView = child
-                logDebugMsg("findWebViewNode--", "find webView")
+                logDebugMsg(
+                    "findWebViewNode--",
+                    "find webView, text = ${accessibilityNodeInfoWebView?.text}"
+                )
                 return
             }
             if (child.childCount > 0) findWebViewNode(child)
         }
     }
 
-    private fun getRecordNode(webViewNode: AccessibilityNodeInfo) {
-        val count = webViewNode.childCount
-        Log.e("getRecordNode--", "childCount: $count")
+    private fun findNodeCnt(webViewNode: AccessibilityNodeInfo?) {
+        if (webViewNode == null) return
+        for (i in 0 until webViewNode.childCount) {
+            val child = webViewNode.getChild(i)
+            if (child.className == "android.view.View") {
+                idCnt = webViewNode.getChild(2)?.getChild(0)?.getChild(0) ?: return
+                logDebugMsg("find cnt", "find cnt, childCount = ${idCnt?.childCount}")
+                return
+            }
+            if (child.childCount > 0) findNodeCnt(child)
+        }
+    }
 
+    private fun findNodeRso(idCnt: AccessibilityNodeInfo?) {
+        if (idCnt == null) return
+        for (i in 0 until idCnt.childCount) {
+            val child = idCnt.getChild(i)
+            if (child.className == "android.view.View") {
+                idRso = idCnt.getChild(3)?.getChild(2)?.getChild(1) ?: return
+            }
+        }
+    }
+
+    private fun getRecordNodes(idCnt: AccessibilityNodeInfo?) {
+        val idRso = idCnt?.getChild(3)?.getChild(2)?.getChild(1) ?: return
+        logDebugMsg("null", "${idRso.childCount}")
+        for (i in 0 until idRso.childCount) {
+            val child = idRso.getChild(i)
+            if (child.getChild(0).getChild(0).getChild(1).getChild(1) != null) {
+                val result = child.getChild(0).getChild(0).getChild(1).getChild(1)
+                logDebugMsg("Result tile", "${result.text}")
+            }
+        }
     }
 }
