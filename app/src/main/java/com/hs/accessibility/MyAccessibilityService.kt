@@ -17,6 +17,7 @@ import java.lang.StringBuilder
 import kotlin.math.log
 
 private const val KEYWORD = "disneyland"
+private const val SEARCH_RESULTS = "Search Results"
 private const val WEB_RESULTS = "Web results"
 private const val TWITTER_RESULTS = "Twitter results"
 
@@ -84,7 +85,7 @@ class MyAccessibilityService : AccessibilityService() {
     private fun findWebViewNode(rootNode: AccessibilityNodeInfo) {
         for (i in 0 until rootNode.childCount) {
             val child = rootNode.getChild(i)
-            if (child.className == WEBVIEW_CLASSNAME) {
+            if (child.className == WEBVIEW_CLASSNAME && !child.text.isNullOrEmpty()) {
                 accessibilityNodeInfoWebView = child
                 logDebugMsg(
                     "find webView, text = ${accessibilityNodeInfoWebView?.text}"
@@ -100,11 +101,8 @@ class MyAccessibilityService : AccessibilityService() {
             val child = webViewNode.getChild(i) ?: return
             if (child.className == VIEW_CLASSNAME) {
                 idCnt = webViewNode.getChild(2)?.getChild(0)?.getChild(0) ?: return
-//                Timber.d("find cnt, id = ${idCnt?.viewIdResourceName}")
                 idCenterCol = idCnt?.getChild(3) ?: return
-//                Timber.d("find CenterCol, id = ${idCenterCol?.viewIdResourceName}")
                 idCenterColChild = idCenterCol?.getChild(2) ?: return
-//                Timber.d("find CenterColChild, id = ${idCenterColChild?.viewIdResourceName}")
                 return
             }
             if (child.childCount > 0) findNodeCenterColChild(webViewNode)
@@ -130,44 +128,31 @@ class MyAccessibilityService : AccessibilityService() {
                 Timber.d("find RsoColChild, id =${idRso?.viewIdResourceName}")
                 return
             }
-            if (child.childCount > 0) findNodeRso(nodeInfo)
         }
     }
 
     private fun getRecordNodes(idRso: AccessibilityNodeInfo?, sb: StringBuilder) {
         if (idRso == null) return
         for (i in 0 until idRso.childCount) {
-            val child = idRso.getChild(i) ?: return
+            val child = idRso.getChild(i)
             Timber.d("Child$i" + "Count, = ${child.childCount}")
-            if (child.getChild(0)?.getChild(0)?.getChild(1)
+
+            if (idRso.parent.childCount <= 2 && child.getChild(0)?.getChild(0)
+                    ?.getChild(1)
                     ?.getChild(1) != null
             ) {
-                val result = child.getChild(0).getChild(0).getChild(1).getChild(1)
-                val twitterResult = child.getChild(0).getChild(0).getChild(0)
-                Timber.d("Result title = ${result.text}")
-                sb.append("(title: ${result.text})")
-                if (!twitterResult.contentDescription.isNullOrEmpty()) {
-                    Timber.d(
-                        "Twitter Result title = ${
-                            twitterResult
-                                .getChild(1).text
-                        }"
-                    )
-                    sb.append(
-                        "(title: ${
-                            twitterResult
-                                .getChild(1).text
-                        })"
-                    )
-                }
-                Timber.i("$sb")
+                val result = child.getChild(0).getChild(0)
+                    .getChild(1).getChild(1)
+                Timber.d("Result title = ${result?.text}")
+                sb.append("(title: ${result?.text})")
+            } else if (child.childCount > 1 && child.getChild(1).childCount > 1 && child.getChild(1)
+                    ?.getChild(1) != null
+            ) {
+                val result = child.getChild(1)?.getChild(1)
+                Timber.d("Result title = ${result?.text}")
+                sb.append("(title: ${result?.text})")
             }
-//            if (child.getChild(0)?.getChild(0)?.getChild(0)?.text == WEB_RESULTS) {
-//                val result = child.getChild(0).getChild(0).getChild(1).getChild(1)
-//                Timber.d("${result.text}")
-//                return
-//            }
-//            if (child.childCount > 0) getRecordNodes(child, sb)
+            Timber.i("$sb")
         }
     }
 
