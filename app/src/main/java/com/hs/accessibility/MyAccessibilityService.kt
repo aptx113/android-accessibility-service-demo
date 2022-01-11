@@ -1,6 +1,10 @@
 package com.hs.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Service
+import android.graphics.Rect
+import android.text.TextUtils
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER
@@ -9,6 +13,8 @@ import com.hs.accessibility.utils.AutoUtil.logDebugMsg
 import com.hs.accessibility.utils.AutoUtil.performSetText
 import kotlinx.coroutines.*
 import timber.log.Timber
+import java.lang.StringBuilder
+import kotlin.math.log
 
 private const val KEYWORD = "disneyland"
 private const val WEB_RESULTS = "Web results"
@@ -49,7 +55,8 @@ class MyAccessibilityService : AccessibilityService() {
                     nodeInfo.performAction(ACTION_IME_ENTER.id)
                 }
             }
-
+            printNodeInfo(this@MyAccessibilityService)
+            delay(4000L)
             findNodeInfoById(
                 rootInActiveWindow,
                 WEBVIEW_CONTAINER_ID
@@ -92,11 +99,11 @@ class MyAccessibilityService : AccessibilityService() {
             val child = webViewNode.getChild(i) ?: return
             if (child.className == VIEW_CLASSNAME) {
                 idCnt = webViewNode.getChild(2)?.getChild(0)?.getChild(0) ?: return
-                Timber.d("find cnt, id = ${idCnt?.viewIdResourceName}")
+//                Timber.d("find cnt, id = ${idCnt?.viewIdResourceName}")
                 idCenterCol = idCnt?.getChild(3) ?: return
-                Timber.d("find CenterCol, id = ${idCenterCol?.viewIdResourceName}")
+//                Timber.d("find CenterCol, id = ${idCenterCol?.viewIdResourceName}")
                 idCenterColChild = idCenterCol?.getChild(2) ?: return
-                Timber.d("find CenterColChild, id = ${idCenterColChild?.viewIdResourceName}")
+//                Timber.d("find CenterColChild, id = ${idCenterColChild?.viewIdResourceName}")
                 return
             }
             if (child.childCount > 0) findNodeCenterColChild(webViewNode)
@@ -109,12 +116,20 @@ class MyAccessibilityService : AccessibilityService() {
             val child = nodeInfo.getChild(i) ?: return
             if (child.viewIdResourceName == "rso") {
                 idRso = child
-                Timber.d("find Rso, id =${idRso?.viewIdResourceName}")
+                Timber.d("find RsoCol, id =${idRso?.viewIdResourceName}")
                 return
             }
-//            if (child.childCount > 0) findNodeRso(child)
         }
-        if (nodeInfo.getChild(2)  == null) return
+
+        if (nodeInfo.getChild(2) == null) return
+        for (i in 0 until nodeInfo.getChild(2).childCount) {
+            val child = nodeInfo.getChild(2).getChild(i) ?: return
+            if (child.viewIdResourceName == "rso") {
+                idRso = child
+                Timber.d("find RsoColChild, id =${idRso?.viewIdResourceName}")
+                return
+            }
+        }
     }
 
     private fun getRecordNodes(idRso: AccessibilityNodeInfo?) {
@@ -135,6 +150,60 @@ class MyAccessibilityService : AccessibilityService() {
 //                return
 //            }
 //            if (child.childCount > 0) getRecordNodes(child)
+        }
+    }
+
+    private fun printNodeInfo(accessibilityService: AccessibilityService) {
+        if (accessibilityService.rootInActiveWindow == null) {
+            Timber.i("Can't get RootNode")
+        }
+
+        val sb = StringBuilder()
+        dumpNodeInfo(accessibilityService.rootInActiveWindow, sb, ArrayList())
+        Timber.i("UI info (call stack:{$sb}")
+    }
+
+    private fun dumpNodeInfo(
+        nodeInfo: AccessibilityNodeInfo?,
+        sb: StringBuilder,
+        layerList: ArrayList<Int>
+    ) {
+        if (nodeInfo == null) return
+
+        val degree = layerList.size
+        for (i in 0 until degree) {
+            sb.append("\t\t")
+        }
+
+        sb.append(TextUtils.join(".", layerList)).append(' ')
+
+        if (nodeInfo.className != null) {
+            sb.append(nodeInfo.className)
+        } else {
+            sb.append("nullClass")
+        }
+
+        if (nodeInfo.text != null) {
+            sb.append("(text: ${nodeInfo.text})")
+        }
+
+        if (nodeInfo.contentDescription != null) {
+            sb.append(" (contentdesc:").append(nodeInfo.contentDescription).append(')')
+        }
+
+        sb.append("(id:").append(nodeInfo.viewIdResourceName).append(")")
+
+//        val rect = Rect()
+//        nodeInfo.getBoundsInScreen(rect)
+//        sb.append(" (").append(rect).append(")")
+
+        sb.append("\n")
+
+        val childCount = nodeInfo.childCount
+        for (i in 0 until childCount) {
+            layerList.add(i)
+            dumpNodeInfo(nodeInfo.getChild(i), sb, layerList)
+            layerList.remove(degree)
         }
     }
 }
