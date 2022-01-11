@@ -18,6 +18,7 @@ import kotlin.math.log
 
 private const val KEYWORD = "disneyland"
 private const val WEB_RESULTS = "Web results"
+private const val TWITTER_RESULTS = "Twitter results"
 
 private const val SEARCH_BOX_ID = "com.google.android.googlequicksearchbox:id/googleapp_search_box"
 private const val WEBVIEW_CONTAINER_ID =
@@ -29,12 +30,13 @@ private const val VIEW_CLASSNAME = "android.view.View"
 class MyAccessibilityService : AccessibilityService() {
 
     private val job = SupervisorJob()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private val scope = CoroutineScope(Dispatchers.IO + job)
     private var accessibilityNodeInfoWebView: AccessibilityNodeInfo? = null
     private var idCnt: AccessibilityNodeInfo? = null
     private var idCenterCol: AccessibilityNodeInfo? = null
     private var idCenterColChild: AccessibilityNodeInfo? = null
     private var idRso: AccessibilityNodeInfo? = null
+    private val sb = StringBuilder()
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val rootInActiveWindow = rootInActiveWindow ?: return
@@ -55,8 +57,7 @@ class MyAccessibilityService : AccessibilityService() {
                     nodeInfo.performAction(ACTION_IME_ENTER.id)
                 }
             }
-            printNodeInfo(this@MyAccessibilityService)
-            delay(4000L)
+            delay(2000L)
             findNodeInfoById(
                 rootInActiveWindow,
                 WEBVIEW_CONTAINER_ID
@@ -66,8 +67,8 @@ class MyAccessibilityService : AccessibilityService() {
 
             findNodeCenterColChild(accessibilityNodeInfoWebView)
             findNodeRso(idCenterCol)
-//            findNodeRso(idCenterColChild)
-//            getRecordNodes(idRso)
+            delay(2000L)
+            getRecordNodes(idRso, sb)
         }
     }
 
@@ -89,7 +90,7 @@ class MyAccessibilityService : AccessibilityService() {
                     "find webView, text = ${accessibilityNodeInfoWebView?.text}"
                 )
                 return
-            } else if (child.childCount > 0) findWebViewNode(child)
+            } else if (child.childCount > 0) findWebViewNode(rootNode)
         }
     }
 
@@ -129,27 +130,44 @@ class MyAccessibilityService : AccessibilityService() {
                 Timber.d("find RsoColChild, id =${idRso?.viewIdResourceName}")
                 return
             }
+            if (child.childCount > 0) findNodeRso(nodeInfo)
         }
     }
 
-    private fun getRecordNodes(idRso: AccessibilityNodeInfo?) {
+    private fun getRecordNodes(idRso: AccessibilityNodeInfo?, sb: StringBuilder) {
         if (idRso == null) return
         for (i in 0 until idRso.childCount) {
             val child = idRso.getChild(i) ?: return
             Timber.d("Child$i" + "Count, = ${child.childCount}")
-            if (child.childCount > 0 && child.getChild(0) != null && child.getChild(0)
-                    .getChild(0) != null && child.getChild(0).getChild(0)
-                    .getChild(0).text == WEB_RESULTS
+            if (child.getChild(0)?.getChild(0)?.getChild(1)
+                    ?.getChild(1) != null
             ) {
                 val result = child.getChild(0).getChild(0).getChild(1).getChild(1)
+                val twitterResult = child.getChild(0).getChild(0).getChild(0)
                 Timber.d("Result title = ${result.text}")
+                sb.append("(title: ${result.text})")
+                if (!twitterResult.contentDescription.isNullOrEmpty()) {
+                    Timber.d(
+                        "Twitter Result title = ${
+                            twitterResult
+                                .getChild(1).text
+                        }"
+                    )
+                    sb.append(
+                        "(title: ${
+                            twitterResult
+                                .getChild(1).text
+                        })"
+                    )
+                }
+                Timber.i("$sb")
             }
 //            if (child.getChild(0)?.getChild(0)?.getChild(0)?.text == WEB_RESULTS) {
 //                val result = child.getChild(0).getChild(0).getChild(1).getChild(1)
 //                Timber.d("${result.text}")
 //                return
 //            }
-//            if (child.childCount > 0) getRecordNodes(child)
+//            if (child.childCount > 0) getRecordNodes(child, sb)
         }
     }
 
