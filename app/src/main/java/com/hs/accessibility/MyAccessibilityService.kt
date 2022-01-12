@@ -6,10 +6,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER
 import com.hs.accessibility.utils.AutoUtil.findNodeInfoById
-import com.hs.accessibility.utils.AutoUtil.findNodeInfoByText
 import com.hs.accessibility.utils.AutoUtil.logDebugMsg
-import com.hs.accessibility.utils.AutoUtil.performClick
-import com.hs.accessibility.utils.AutoUtil.performScroll
 import com.hs.accessibility.utils.AutoUtil.performSetText
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -23,6 +20,8 @@ private const val APP_SEARCH_BOX_ID =
     "com.google.android.googlequicksearchbox:id/googleapp_search_box"
 private const val WEBVIEW_CONTAINER_ID =
     "com.google.android.googlequicksearchbox:id/webx_web_container"
+private const val RSO_ID = "rso"
+private const val BOTSTUFF_ID = "botstuff"
 
 private const val WEBVIEW_CLASSNAME = "android.webkit.WebView"
 private const val VIEW_CLASSNAME = "android.view.View"
@@ -36,6 +35,7 @@ class MyAccessibilityService : AccessibilityService() {
     private var idCenterCol: AccessibilityNodeInfo? = null
     private var idCenterColChild: AccessibilityNodeInfo? = null
     private var idRso: AccessibilityNodeInfo? = null
+    private var idBotStuff: AccessibilityNodeInfo? = null
     private val sb = StringBuilder()
 
     override fun onServiceConnected() {
@@ -75,18 +75,19 @@ class MyAccessibilityService : AccessibilityService() {
         }
 
         findNodeCenterColChild(accessibilityNodeInfoWebView)
-        findNodeRso(idCenterCol)
+        findNodeUnderCol(idCenterCol, 2)
+        findNodeUnderCol(idCenterCol, 4)
         Thread.sleep(2000L)
-        getRecordNodes(idRso, sb)
-
+        getRecordNodes(idRso, idBotStuff, sb)
+        findNodeUnderCol(idCenterCol, 4)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
         accessibilityNodeInfoWebView?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
 
-//       idCenterCol?.getChild(4)?.getChild(0)?.getChild(3)
-//            ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        idCenterCol?.getChild(4)?.getChild(0)?.getChild(3)
+            ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
     override fun onInterrupt() {
@@ -125,7 +126,10 @@ class MyAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun findNodeRso(nodeInfo: AccessibilityNodeInfo?, index: Int = 0, id: String = "") {
+    private fun findNodeUnderCol(
+        nodeInfo: AccessibilityNodeInfo?,
+        index: Int = 0,
+    ) {
         if (nodeInfo == null) return
         for (i in 0 until nodeInfo.childCount) {
             val child = nodeInfo.getChild(i) ?: return
@@ -139,7 +143,13 @@ class MyAccessibilityService : AccessibilityService() {
         if (nodeInfo.getChild(2) == null) return
         for (i in 0 until nodeInfo.getChild(index).childCount) {
             val child = nodeInfo.getChild(index).getChild(i) ?: return
-            if (child.viewIdResourceName == "rso") {
+            val colChild = nodeInfo.getChild(index) ?: return
+            if (colChild.viewIdResourceName == BOTSTUFF_ID) {
+                idBotStuff = colChild
+                Timber.d("find BotStuffCol, id =${idBotStuff?.viewIdResourceName}")
+                return
+            }
+            if (child.viewIdResourceName == RSO_ID) {
                 idRso = child
                 Timber.d("find RsoColChild, id =${idRso?.viewIdResourceName}")
                 return
@@ -147,7 +157,11 @@ class MyAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun getRecordNodes(idRso: AccessibilityNodeInfo?, sb: StringBuilder) {
+    private fun getRecordNodes(
+        idRso: AccessibilityNodeInfo?,
+        idBotStuff: AccessibilityNodeInfo?,
+        sb: StringBuilder
+    ) {
         if (idRso == null) return
         for (i in 0 until idRso.childCount) {
             val child = idRso.getChild(i) ?: return
@@ -156,20 +170,19 @@ class MyAccessibilityService : AccessibilityService() {
             if (idRso.parent.viewIdResourceName.isNullOrEmpty()) {
                 var result = AccessibilityNodeInfo()
                 val intermediaryNode = child.getChild(0)?.getChild(0)
-                when {
+                result.text = when {
                     !intermediaryNode
-                        ?.getChild(1)?.contentDescription.isNullOrEmpty() -> result =
-                        child.getChild(0).getChild(0)
-                            .getChild(1).getChild(1)
+                        ?.getChild(1)?.contentDescription.isNullOrEmpty() ->
+                        intermediaryNode
+                            ?.getChild(1)?.getChild(1)?.text
                     !intermediaryNode
-                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> result =
-                        child.getChild(0).getChild(0)
-                            .getChild(0).getChild(1)
+                        ?.getChild(0)?.contentDescription.isNullOrEmpty() ->
+                        intermediaryNode
+                            ?.getChild(0)?.getChild(1)?.text
                     !intermediaryNode
-                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(0)
-                        .getChild(0)
-                        .getChild(0).getChild(1)
-                    else -> result.text = "child$i is not our target"
+                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> intermediaryNode
+                        ?.getChild(0)?.getChild(1)?.text
+                    else -> "child$i is not our target"
                 }
                 Timber.d("Result title = ${result.text}")
                 if (!sb.toString().contains(result.text)) sb.append("(title: ${result.text})")
@@ -184,8 +197,29 @@ class MyAccessibilityService : AccessibilityService() {
                 if (!sb.toString().contains(result.text)) sb.append("\n")
                     .append("(title: ${result?.text})")
             }
-            Timber.i("$sb")
         }
+        if (idBotStuff == null) return
+        val newResults = idBotStuff.getChild(0).getChild(3)
+        for (i in 0 until newResults.childCount) {
+            val child = newResults.getChild(i) ?: return
+            Timber.d("Child$i" + "Count, = ${child.childCount}")
+            var result = AccessibilityNodeInfo()
+            val intermediaryNode = child.getChild(0)
+            result.text = when {
+                !intermediaryNode
+                    ?.getChild(0)?.contentDescription.isNullOrEmpty() -> intermediaryNode
+                    .getChild(0).getChild(1).text
+                !intermediaryNode?.getChild(0)?.getChild(0)?.contentDescription.isNullOrEmpty() ->
+                    intermediaryNode.getChild(0).getChild(1).getChild(0).text
+                intermediaryNode?.childCount == 2 && !intermediaryNode?.getChild(1)?.contentDescription.isNullOrEmpty() ->
+                    intermediaryNode.getChild(1).getChild(1).text
+                else -> "child${i + idRso.childCount} is not our target"
+            }
+            Timber.d("Result title = ${result.text}")
+            if (!sb.toString().contains(result.text)) sb.append("(title: ${result.text})")
+                .append("\n")
+        }
+        Timber.i("$sb")
     }
 
     private fun printNodeInfo(accessibilityService: AccessibilityService) {
