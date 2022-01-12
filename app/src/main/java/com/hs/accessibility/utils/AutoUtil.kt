@@ -9,7 +9,7 @@ object AutoUtil {
 
     fun findNodeInfoByText(nodeInfo: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
         val list = nodeInfo.findAccessibilityNodeInfosByText(text)
-        return if (list.size > 0) list[0] else null
+        return if (list.size > 0) list?.get(0) else null
     }
 
 
@@ -48,7 +48,6 @@ object AutoUtil {
         if (nodeInfo.isClickable)
             nodeInfo.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         else performClick(nodeInfo.parent, tag, msg)
-        nodeInfo.recycle()
         logDebugMsg(msg)
     }
 
