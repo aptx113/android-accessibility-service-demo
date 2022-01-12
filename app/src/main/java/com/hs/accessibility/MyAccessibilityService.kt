@@ -168,7 +168,7 @@ class MyAccessibilityService : AccessibilityService() {
             Timber.d("Child$i" + "Count, = ${child.childCount}")
             if (idRso.parent == null) return
             if (idRso.parent.viewIdResourceName.isNullOrEmpty()) {
-                var result = AccessibilityNodeInfo()
+                val result = AccessibilityNodeInfo()
                 val intermediaryNode = child.getChild(0)?.getChild(0)
                 result.text = when {
                     !intermediaryNode
@@ -203,7 +203,7 @@ class MyAccessibilityService : AccessibilityService() {
         for (i in 0 until newResults.childCount) {
             val child = newResults.getChild(i) ?: return
             Timber.d("Child$i" + "Count, = ${child.childCount}")
-            var result = AccessibilityNodeInfo()
+            val result = AccessibilityNodeInfo()
             val intermediaryNode = child.getChild(0)
             result.text = when {
                 !intermediaryNode
@@ -211,7 +211,10 @@ class MyAccessibilityService : AccessibilityService() {
                     .getChild(0).getChild(1).text
                 !intermediaryNode?.getChild(0)?.getChild(0)?.contentDescription.isNullOrEmpty() ->
                     intermediaryNode.getChild(0).getChild(1).getChild(0).text
-                intermediaryNode?.childCount == 2 && !intermediaryNode?.getChild(1)?.contentDescription.isNullOrEmpty() ->
+                !intermediaryNode?.getChild(0)
+                    ?.getChild(0)?.text.isNullOrEmpty() -> intermediaryNode.getChild(0).getChild(1)
+                    .getChild(0).text
+                child.childCount == 2 && !intermediaryNode?.getChild(1)?.contentDescription.isNullOrEmpty() ->
                     intermediaryNode.getChild(1).getChild(1).text
                 else -> "child${i + idRso.childCount} is not our target"
             }
