@@ -51,8 +51,9 @@ class MyAccessibilityService : AccessibilityService() {
 
     fun search() {
         logDebugMsg("launch")
+        val rootNode = rootInActiveWindow ?: return
         findNodeInfoById(
-            rootInActiveWindow,
+            rootNode,
             APP_SEARCH_BOX_ID
         )?.let { nodeInfo ->
             if (nodeInfo.text == null || !nodeInfo.text.toString()
@@ -68,18 +69,16 @@ class MyAccessibilityService : AccessibilityService() {
         }
         Thread.sleep(1000L)
         findNodeInfoById(
-            rootInActiveWindow,
+            rootNode,
             WEBVIEW_CONTAINER_ID
         )?.let {
             findWebViewNode(it.getChild(0))
         }
 
         findNodeCenterColChild(accessibilityNodeInfoWebView)
-        findNodeUnderCol(idCenterCol, 2)
-        findNodeUnderCol(idCenterCol, 4)
+        findNodeUnderCol(idCenterCol)
         Thread.sleep(2000L)
         getRecordNodes(idRso, idBotStuff, sb)
-        findNodeUnderCol(idCenterCol, 4)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -127,31 +126,28 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     private fun findNodeUnderCol(
-        nodeInfo: AccessibilityNodeInfo?,
-        index: Int = 0,
+        nodeInfo: AccessibilityNodeInfo?
     ) {
-        if (nodeInfo == null) return
+        if (nodeInfo?.getChild(2) == null) return
         for (i in 0 until nodeInfo.childCount) {
-            val child = nodeInfo.getChild(i) ?: return
-            if (child.viewIdResourceName == "rso") {
+            val child = nodeInfo.getChild(2).getChild(i) ?: return
+            val colChild = nodeInfo.getChild(4) ?: return
+            if (colChild.viewIdResourceName == BOTSTUFF_ID && child.viewIdResourceName == RSO_ID) {
+                idBotStuff = colChild
+                Timber.d("find BotStuffColChild, id =${idBotStuff?.viewIdResourceName}")
                 idRso = child
-                Timber.d("find RsoCol, id =${idRso?.viewIdResourceName}")
+                Timber.d("find RsoColChild, id =${idRso?.viewIdResourceName}")
                 return
             }
         }
-
-        if (nodeInfo.getChild(2) == null) return
-        for (i in 0 until nodeInfo.getChild(index).childCount) {
-            val child = nodeInfo.getChild(index).getChild(i) ?: return
-            val colChild = nodeInfo.getChild(index) ?: return
-            if (colChild.viewIdResourceName == BOTSTUFF_ID) {
+        for (i in 0 until nodeInfo.childCount) {
+            val child = nodeInfo.getChild(4) ?: return
+            val colChild = nodeInfo.getChild(i) ?: return
+            if (child.viewIdResourceName == "rso" && colChild.viewIdResourceName == BOTSTUFF_ID) {
+                idRso = child
+                Timber.d("find RsoCol, id =${idRso?.viewIdResourceName}")
                 idBotStuff = colChild
                 Timber.d("find BotStuffCol, id =${idBotStuff?.viewIdResourceName}")
-                return
-            }
-            if (child.viewIdResourceName == RSO_ID) {
-                idRso = child
-                Timber.d("find RsoColChild, id =${idRso?.viewIdResourceName}")
                 return
             }
         }
@@ -171,31 +167,43 @@ class MyAccessibilityService : AccessibilityService() {
                 val result = AccessibilityNodeInfo()
                 val intermediaryNode = child.getChild(0)?.getChild(0)
                 result.text = when {
-                    !intermediaryNode
-                        ?.getChild(1)?.contentDescription.isNullOrEmpty() ->
+                    child.childCount >= 1 && !intermediaryNode
+                        ?.getChild(1)?.contentDescription.isNullOrEmpty()
+                    ->
                         intermediaryNode
                             ?.getChild(1)?.getChild(1)?.text
-                    !intermediaryNode
-                        ?.getChild(0)?.contentDescription.isNullOrEmpty() ->
+                    child.childCount >= 1 &&
+                            !intermediaryNode
+                                ?.getChild(0)?.contentDescription.isNullOrEmpty() ->
                         intermediaryNode
                             ?.getChild(0)?.getChild(1)?.text
-                    !intermediaryNode
+                    child.childCount >= 1 && !intermediaryNode
+                        ?.getChild(0)
                         ?.getChild(0)?.contentDescription.isNullOrEmpty() -> intermediaryNode
+                        ?.getChild(0)?.getChild(0)?.getChild(1)?.text
+                    child.childCount >= 2 && !child.getChild(1)?.getChild(0)
+                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(1)
+                        ?.getChild(0)
                         ?.getChild(0)?.getChild(1)?.text
                     else -> "child$i is not our target"
                 }
                 Timber.d("Result title = ${result.text}")
                 if (!sb.toString().contains(result.text)) sb.append("(title: ${result.text})")
                     .append("\n")
-            } else if (child.childCount > 1 && child.getChild(1).childCount > 1 && child.getChild(
-                    1
-                )
-                    ?.getChild(1) != null
-            ) {
-                val result = child.getChild(1).getChild(1)
-                Timber.d("Result title = ${result?.text}")
+            } else {
+                val result = AccessibilityNodeInfo()
+                result.text = when {
+                    child.childCount >= 2 && !child.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(
+                        0
+                    ).getChild(1).text
+                    child.childCount >= 2 && !child.getChild(0)
+                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(0)
+                        .getChild(0).getChild(1).text
+                    else -> "child$i is not our target"
+                }
+                Timber.d("Result title = ${result.text}")
                 if (!sb.toString().contains(result.text)) sb.append("\n")
-                    .append("(title: ${result?.text})")
+                    .append("(title: ${result.text})")
             }
         }
         if (idBotStuff == null) return
