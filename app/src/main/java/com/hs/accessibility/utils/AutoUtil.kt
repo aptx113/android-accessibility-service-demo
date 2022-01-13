@@ -1,10 +1,16 @@
 package com.hs.accessibility.utils
 
 import android.os.Bundle
-import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import timber.log.Timber
 
 object AutoUtil {
+
+
+    fun findNodeInfoByText(nodeInfo: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        val list = nodeInfo.findAccessibilityNodeInfosByText(text)
+        return if (list.size > 0) list?.get(0) else null
+    }
 
 
     fun findNodeInfoById(nodeInfo: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? {
@@ -21,7 +27,6 @@ object AutoUtil {
     fun performSetText(
         nodeInfo: AccessibilityNodeInfo?,
         text: String,
-        tag: String,
         msg: String
     ) {
         if (nodeInfo == null) return
@@ -29,9 +34,9 @@ object AutoUtil {
             AccessibilityNodeInfo.ACTION_SET_TEXT,
             createBundledText(text)
         )
-        else performSetText(nodeInfo.parent, text, tag, msg)
+        else performSetText(nodeInfo.parent, text, msg)
         nodeInfo.recycle()
-        logDebugMsg(tag, msg)
+        logDebugMsg(msg)
     }
 
     fun performClick(
@@ -43,8 +48,7 @@ object AutoUtil {
         if (nodeInfo.isClickable)
             nodeInfo.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         else performClick(nodeInfo.parent, tag, msg)
-        nodeInfo.recycle()
-        logDebugMsg(tag, msg)
+        logDebugMsg(msg)
     }
 
     fun performClickSuggestion(
@@ -63,14 +67,13 @@ object AutoUtil {
         }
     }
 
-    fun performScroll(nodeInfo: AccessibilityNodeInfo?, tag: String, msg: String) {
+    fun performScroll(nodeInfo: AccessibilityNodeInfo?, msg: String) {
         if (nodeInfo == null) return
         if (nodeInfo.isScrollable) nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) else performScroll(
             nodeInfo.parent,
-            tag,
             msg
         )
-        logDebugMsg(tag, msg)
+        logDebugMsg(msg)
     }
 
     private fun createBundledText(text: String) = Bundle().let {
@@ -78,5 +81,5 @@ object AutoUtil {
         it
     }
 
-    fun logDebugMsg(tag: String, msg: String) = Log.d(tag, msg)
+    fun logDebugMsg(msg: String) = Timber.d(msg)
 }
