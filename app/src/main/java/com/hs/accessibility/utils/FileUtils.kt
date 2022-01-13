@@ -16,7 +16,7 @@ object FileUtils {
         val date = dateFormat.format(Calendar.getInstance().time)
 
         if (!directory.exists()) directory.mkdir()
-        val fileName = "ScreenShot $date .jpg"
+        val fileName = "ScreenShotAccess $date .jpg"
 
         try {
             val fileOutputStream = context.openFileOutput(fileName, Context.MODE_PRIVATE)

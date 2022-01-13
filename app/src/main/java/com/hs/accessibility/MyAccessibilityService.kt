@@ -1,8 +1,8 @@
 package com.hs.accessibility
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityService.ScreenshotResult
-import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.graphics.Bitmap
 import android.os.Build
 import android.text.TextUtils
 import android.view.Display
@@ -13,15 +13,10 @@ import androidx.annotation.RequiresApi
 import com.hs.accessibility.utils.AutoUtil.findNodeInfoById
 import com.hs.accessibility.utils.AutoUtil.logDebugMsg
 import com.hs.accessibility.utils.AutoUtil.performSetText
+import com.hs.accessibility.utils.FileUtils.saveImage
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.concurrent.Executor
-import android.util.Log
-
-import android.graphics.Bitmap
-
-import androidx.annotation.NonNull
-import com.hs.accessibility.utils.FileUtils.saveImage
 
 
 private const val KEYWORD = "disneyland"
@@ -54,6 +49,13 @@ class MyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
 
+        val info = AccessibilityServiceInfo().apply {
+            eventTypes =
+                AccessibilityEvent.TYPE_VIEW_SCROLLED or AccessibilityEvent.TYPE_VIEW_LONG_CLICKED or
+                        AccessibilityEvent.TYPE_VIEW_CLICKED
+//            packageNames = arrayOf("com.hs.accessibility")
+        }
+        serviceInfo = info
         scope.launch {
             while (true) {
                 search()
@@ -96,10 +98,22 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
-        accessibilityNodeInfoWebView?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-
-        idCenterCol?.getChild(4)?.getChild(0)?.getChild(3)
-            ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        when (event?.eventType) {
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> accessibilityNodeInfoWebView?.performAction(
+                AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            )
+            AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+                performGlobalAction(
+                    GLOBAL_ACTION_TAKE_SCREENSHOT
+                )
+            }
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> idCenterCol?.getChild(4)?.getChild(0)
+                ?.getChild(3)
+                ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            else -> {
+                Timber.d("${event?.contentDescription}")
+            }
+        }
     }
 
     override fun onInterrupt() {
@@ -121,7 +135,7 @@ class MyAccessibilityService : AccessibilityService() {
                     val bitmap =
                         Bitmap.wrapHardwareBuffer(screenshot.hardwareBuffer, screenshot.colorSpace)
                             ?: return
-                    saveImage(bitmap,applicationContext,"Accessibility")
+                    saveImage(bitmap, applicationContext, "Accessibility")
                 }
 
                 override fun onFailure(errorCode: Int) {
