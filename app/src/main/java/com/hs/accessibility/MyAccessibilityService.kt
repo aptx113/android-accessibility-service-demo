@@ -1,15 +1,23 @@
 package com.hs.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.graphics.Bitmap
+import android.os.Build
 import android.text.TextUtils
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER
+import androidx.annotation.RequiresApi
 import com.hs.accessibility.utils.AutoUtil.findNodeInfoById
 import com.hs.accessibility.utils.AutoUtil.logDebugMsg
 import com.hs.accessibility.utils.AutoUtil.performSetText
+import com.hs.accessibility.utils.FileUtils.saveImage
 import kotlinx.coroutines.*
 import timber.log.Timber
+import java.util.concurrent.Executor
+
 
 private const val KEYWORD = "disneyland"
 private const val SEARCH_RESULTS = "Search Results"
@@ -41,6 +49,13 @@ class MyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
 
+        val info = AccessibilityServiceInfo().apply {
+            eventTypes =
+                AccessibilityEvent.TYPE_VIEW_SCROLLED or AccessibilityEvent.TYPE_VIEW_LONG_CLICKED or
+                        AccessibilityEvent.TYPE_VIEW_CLICKED
+//            packageNames = arrayOf("com.hs.accessibility")
+        }
+        serviceInfo = info
         scope.launch {
             while (true) {
                 search()
@@ -83,13 +98,50 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
-        accessibilityNodeInfoWebView?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-
-        idCenterCol?.getChild(4)?.getChild(0)?.getChild(3)
-            ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        when (event?.eventType) {
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> accessibilityNodeInfoWebView?.performAction(
+                AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            )
+            AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+                performGlobalAction(
+                    GLOBAL_ACTION_TAKE_SCREENSHOT
+                )
+            }
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> idCenterCol?.getChild(4)?.getChild(0)
+                ?.getChild(3)
+                ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            else -> {
+                Timber.d("${event?.contentDescription}")
+            }
+        }
     }
 
     override fun onInterrupt() {
+    }
+
+    override fun takeScreenshot(
+        displayId: Int,
+        executor: Executor,
+        callback: TakeScreenshotCallback
+    ) {
+        super.takeScreenshot(displayId, executor, callback)
+        takeScreenshot(
+            Display.DEFAULT_DISPLAY,
+            applicationContext.mainExecutor,
+            object : TakeScreenshotCallback {
+                @RequiresApi(api = Build.VERSION_CODES.R)
+                override fun onSuccess(screenshot: ScreenshotResult) {
+                    Timber.i("ScreenShot Result: onSuccess")
+                    val bitmap =
+                        Bitmap.wrapHardwareBuffer(screenshot.hardwareBuffer, screenshot.colorSpace)
+                            ?: return
+                    saveImage(bitmap, applicationContext, "Accessibility")
+                }
+
+                override fun onFailure(errorCode: Int) {
+                    Timber.i("ScreenShotResult: onFailure code is $errorCode")
+                }
+            })
     }
 
     override fun onDestroy() {
@@ -182,13 +234,17 @@ class MyAccessibilityService : AccessibilityService() {
                         ?.getChild(0)?.contentDescription.isNullOrEmpty() -> intermediaryNode
                         ?.getChild(0)?.getChild(0)?.getChild(1)?.text
                     child.childCount >= 2 && !child.getChild(1)?.getChild(0)
-                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(1)
+                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(
+                        1
+                    )
                         ?.getChild(0)
                         ?.getChild(0)?.getChild(1)?.text
                     else -> "child$i is not our target"
                 }
                 Timber.d("Result title = ${result.text}")
-                if (!sb.toString().contains(result.text)) sb.append("(title: ${result.text})")
+                if (!sb.toString()
+                        .contains(result.text)
+                ) sb.append("(title: ${result.text})")
                     .append("\n")
             } else {
                 val result = AccessibilityNodeInfo()
@@ -197,7 +253,9 @@ class MyAccessibilityService : AccessibilityService() {
                         0
                     ).getChild(1).text
                     child.childCount >= 2 && !child.getChild(0)
-                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(0)
+                        ?.getChild(0)?.contentDescription.isNullOrEmpty() -> child.getChild(
+                        0
+                    )
                         .getChild(0).getChild(1).text
                     else -> "child$i is not our target"
                 }
@@ -217,10 +275,12 @@ class MyAccessibilityService : AccessibilityService() {
                 !intermediaryNode
                     ?.getChild(0)?.contentDescription.isNullOrEmpty() -> intermediaryNode
                     .getChild(0).getChild(1).text
-                !intermediaryNode?.getChild(0)?.getChild(0)?.contentDescription.isNullOrEmpty() ->
+                !intermediaryNode?.getChild(0)
+                    ?.getChild(0)?.contentDescription.isNullOrEmpty() ->
                     intermediaryNode.getChild(0).getChild(1).getChild(0).text
                 !intermediaryNode?.getChild(0)
-                    ?.getChild(0)?.text.isNullOrEmpty() -> intermediaryNode.getChild(0).getChild(1)
+                    ?.getChild(0)?.text.isNullOrEmpty() -> intermediaryNode.getChild(0)
+                    .getChild(1)
                     .getChild(0).text
                 child.childCount == 2 && !intermediaryNode?.getChild(1)?.contentDescription.isNullOrEmpty() ->
                     intermediaryNode.getChild(1).getChild(1).text
