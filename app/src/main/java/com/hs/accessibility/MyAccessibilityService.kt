@@ -46,13 +46,18 @@ class MyAccessibilityService : AccessibilityService() {
     private var idBotStuff: AccessibilityNodeInfo? = null
     private val sb = StringBuilder()
 
+    override fun onCreate() {
+        super.onCreate()
+        serviceInfo?.flags = AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
 
         val info = AccessibilityServiceInfo().apply {
             eventTypes =
                 AccessibilityEvent.TYPE_VIEW_SCROLLED or AccessibilityEvent.TYPE_VIEW_LONG_CLICKED or
-                        AccessibilityEvent.TYPE_VIEW_CLICKED
+                        AccessibilityEvent.TYPE_VIEW_CLICKED or AccessibilityEvent.TYPE_VIEW_FOCUSED or AccessibilityEvent.TYPE_VIEW_HOVER_ENTER or AccessibilityEvent.TYPE_TOUCH_INTERACTION_START
 //            packageNames = arrayOf("com.hs.accessibility")
         }
         serviceInfo = info
@@ -89,16 +94,17 @@ class MyAccessibilityService : AccessibilityService() {
         )?.let {
             findWebViewNode(it.getChild(0))
         }
-
         findNodeCenterColChild(accessibilityNodeInfoWebView)
         findNodeUnderCol(idCenterCol)
         Thread.sleep(2000L)
         getRecordNodes(idRso, idBotStuff, sb)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
 
-        when (event?.eventType) {
+        val source = event.source ?: return
+
+        when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> accessibilityNodeInfoWebView?.performAction(
                 AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             )
@@ -110,10 +116,23 @@ class MyAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> idCenterCol?.getChild(4)?.getChild(0)
                 ?.getChild(3)
                 ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            AccessibilityEvent.TYPE_VIEW_HOVER_ENTER -> if (source.isVisibleToUser) source.performAction(
+                AccessibilityNodeInfo.ACTION_CLICK
+            )
+            AccessibilityEvent.TYPE_TOUCH_INTERACTION_START -> if (source.isClickable && source.isVisibleToUser) source.performAction(
+                AccessibilityNodeInfo.ACTION_CLICK
+            )
+            AccessibilityEvent.TYPE_VIEW_FOCUSED -> if (source.isClickable && source.isVisibleToUser) source.performAction(
+                AccessibilityNodeInfo.ACTION_CLICK
+            )
             else -> {
-                Timber.d("${event?.contentDescription}")
+//                if (source.isClickable && source.isVisibleToUser) source.performAction(
+//                    AccessibilityNodeInfo.ACTION_CLICK
+//                )
+                Timber.d("$event")
             }
         }
+        Timber.d("$event")
     }
 
     override fun onInterrupt() {
@@ -219,7 +238,7 @@ class MyAccessibilityService : AccessibilityService() {
                 val result = AccessibilityNodeInfo()
                 val intermediaryNode = child.getChild(0)?.getChild(0)
                 result.text = when {
-                    child.childCount >= 1 && !intermediaryNode
+                    child.childCount >= 2 && !intermediaryNode
                         ?.getChild(1)?.contentDescription.isNullOrEmpty()
                     ->
                         intermediaryNode
@@ -265,9 +284,8 @@ class MyAccessibilityService : AccessibilityService() {
             }
         }
         if (idBotStuff == null) return
-        val newResults = idBotStuff.getChild(0).getChild(3)
-        for (i in 0 until newResults.childCount) {
-            val child = newResults.getChild(i) ?: return
+        for (i in 0 until idBotStuff.getChild(0).getChild(3).childCount) {
+            val child = idBotStuff.getChild(0)?.getChild(3)?.getChild(i) ?: return
             Timber.d("Child$i" + "Count, = ${child.childCount}")
             val result = AccessibilityNodeInfo()
             val intermediaryNode = child.getChild(0)
@@ -344,6 +362,18 @@ class MyAccessibilityService : AccessibilityService() {
             layerList.add(i)
             dumpNodeInfo(nodeInfo.getChild(i), sb, layerList)
             layerList.remove(degree)
+        }
+    }
+
+    private fun getListItemNodeInfo(source: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var current = source
+        while (true) {
+
+            val parent = current.parent ?: return null
+            if (parent.className == VIEW_CLASSNAME) return current
+            val oldCurrent = current
+            current = parent
+            oldCurrent.recycle()
         }
     }
 }
